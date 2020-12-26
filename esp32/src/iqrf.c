@@ -35,9 +35,16 @@ void iqrfInit(void) {
     uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
 
+void uartSend(char *buffer, size_t size) {
+    static const char *TX_TASK = "IQRF_TX";
+    const int bytes = uart_write_bytes(UART_NUM_1, buffer, size);
+    ESP_LOGI(TX_TASK, "Sent %d bytes: '%s'", bytes, buffer);
+    ESP_LOG_BUFFER_HEXDUMP(TX_TASK, buffer, bytes, ESP_LOG_INFO);
+}
+
 void iqrfRxTask(void *arg) {
-    static const char *RX_TASK_TAG = "IQRF_RX_TASK";
-    esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
+    static const char *RX_TAG = "IQRF_RX";
+    esp_log_level_set(RX_TAG, ESP_LOG_INFO);
     uint8_t *buffer = malloc(RX_BUF_SIZE + 1);
     while (true) {
         const int bytes = uart_read_bytes(UART_NUM_1, buffer, RX_BUF_SIZE, 1000 / portTICK_RATE_MS);
@@ -45,36 +52,40 @@ void iqrfRxTask(void *arg) {
             continue;
         }
         buffer[bytes] = 0;
-        ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", bytes, buffer);
-        ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, buffer, bytes, ESP_LOG_INFO);
-        if (strcmp((char *) buffer, "getInputVoltage") == 0) {
+        ESP_LOGI(RX_TAG, "Read %d bytes: '%s'", bytes, buffer);
+        ESP_LOG_BUFFER_HEXDUMP(RX_TAG, buffer, bytes, ESP_LOG_INFO);
+        if (strcmp((char *) buffer, "getVoltage") == 0) {
             uint16_t voltage = adcReadVoltage();
             char txBuffer[2] = {(voltage >> 8) & 0xff, voltage & 0xff};
-            uart_write_bytes(UART_NUM_1, txBuffer, 2);
+            uartSend(txBuffer, 2);
             continue;
         }
-        if (strncmp((char *) buffer, "setDuty,", 8) == 0) {
-            char channelChar = buffer[8];
-            uint8_t channel = channelChar - '0';
+        if (strncmp((char *) buffer, "setChannel,", 8) == 0) {
+            uint8_t channel = buffer[8] - '0';
             if (channel >= LED_CHANNELS) {
                 continue;
             }
             unsigned long duty = strtoul((char *) &buffer[10], NULL, 10) * 10;
-            if (duty > 1023) {
-                duty = 1023;
-            }
-            ledcSetDutyCycle(&ledc_channels[channel], duty);
+            ledcSetDutyCycle(channel, duty > 1023 ? 1023 : duty);
             continue;
         }
-        if (strncmp((char *) buffer, "getDuty,", 8) == 0) {
-            char channelChar = buffer[8];
-            uint8_t channel = channelChar - '0';
+        if (strcmp((char *) buffer, "getChannels") == 0) {
+            char txBuffer[LED_CHANNELS] = {0,};
+            for (uint8_t channel = 0; channel < LED_CHANNELS; channel++) {
+                uint32_t duty = ledcGetDutyCycle(channel) / 10;
+                txBuffer[channel] = duty & 0xff;
+            }
+            uartSend(txBuffer, LED_CHANNELS);
+            continue;
+        }
+        if (strncmp((char *) buffer, "getChannel,", 8) == 0) {
+            uint8_t channel = buffer[8] - '0';
             if (channel >= LED_CHANNELS) {
                 continue;
             }
-            uint32_t duty = ledcGetDutyCycle(&ledc_channels[channel]) / 10;
-            char txBuffer[2] = {duty & 0xff};
-            uart_write_bytes(UART_NUM_1, txBuffer, 2);
+            uint32_t duty = ledcGetDutyCycle(channel) / 10;
+            char txBuffer[1] = {duty & 0xff};
+            uartSend(txBuffer, 1);
             continue;
         }
     }

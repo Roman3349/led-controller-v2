@@ -18,6 +18,7 @@
 
 #include <driver/ledc.h>
 #include <esp_err.h>
+#include <esp_log.h>
 
 //#define LED_CHANNELS 6
 #define LED_CHANNELS 4
@@ -28,6 +29,8 @@
 #define LED_STRIP1_GREEN    32
 #define LED_STRIP1_RED      35
 #define LED_STRIP1_BLUE     34
+
+#define LEDC_TAG "LEDC"
 
 /**
  * LED Controller channels configuration
@@ -41,14 +44,14 @@ void ledcInit(void);
 
 /**
  * Returns the duty cycle of the LED controller channel
- * @param channel LED Controller channel
+ * @param channel LED Controller channel number
  * @return Channel's duty cycle
  */
-uint32_t ledcGetDutyCycle(ledc_channel_config_t *channel);
+uint32_t ledcGetDutyCycle(uint8_t channel);
 
 /**
  * Sets the channel's duty cycle
- * @param channel LED Controller channel
+ * @param channel LED Controller channel number
  * @param duty Duty cycle
  */
-void ledcSetDutyCycle(ledc_channel_config_t *channel, uint32_t duty);
+void ledcSetDutyCycle(uint8_t channel, uint32_t duty);

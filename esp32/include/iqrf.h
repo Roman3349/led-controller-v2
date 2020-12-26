@@ -35,3 +35,10 @@ void iqrfInit(void);
  * @param arg Argument
  */
 void iqrfRxTask(void *arg);
+
+/**
+ * Sends data over UART
+ * @param buffer Data to send
+ * @param size Size of data to send
+ */
+void uartSend(char *buffer, size_t size);

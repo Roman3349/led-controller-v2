@@ -24,29 +24,24 @@
 #include <esp_log.h>
 
 #include "adc.h"
+#include "ledc.h"
 
 #define GATTS_TAG "GATTS"
 
-#define GATTS_SERVICE_UUID_TEST_A   0x00FF
-#define GATTS_CHAR_UUID_TEST_A      0xFF01
-#define GATTS_NUM_HANDLE_TEST_A     4
+#define GATTS_SERVICE_UUID_DEVICE_INFO  0x180A
+#define GATTS_CHAR_UUID_MANUFACTURER    0x2A29
+#define GATTS_NUM_HANDLE_DEVICE_INFO    4
 
-#define GATTS_SERVICE_UUID_TEST_B   0x00EE
-#define GATTS_CHAR_UUID_TEST_B      0xEE01
-#define GATTS_NUM_HANDLE_TEST_B     4
+#define GATTS_SERVICE_UUID_VOLTAGE      0x183B
+#define GATTS_CHAR_UUID_VOLTAGE         0x2B18
+#define GATTS_NUM_HANDLE_VOLTAGE        4
 
-#define GATTS_SERVICE_UUID_VOLTAGE  0x183B
-#define GATTS_CHAR_UUID_VOLTAGE     0x2B18
-#define GATTS_NUM_HANDLE_VOLTAGE    4
+#define GATTS_SERVICE_UUID_LIGHT_DATA   0x181C
+#define GATTS_CHAR_UUID_LIGHT_INTENSITY 0x2B01
+#define GATTS_NUM_HANDLE_LIGHT_DATA     4
 
 /// Device name
 #define DEVICE_NAME                 "LED Controller v2.0"
-/// Manufacturer data length
-#define MANUFACTURER_DATA_LEN       0
-
-#define GATTS_DEMO_CHAR_VAL_LEN_MAX 0x40
-
-#define PREPARE_BUF_MAX_SIZE        1024
 
 /**
  * Registers GATTS services

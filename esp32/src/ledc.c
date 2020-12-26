@@ -64,16 +64,28 @@ void ledcInit(void) {
     
     // Sets configuration for LED Controller channels
     for (uint8_t channel = 0; channel < LED_CHANNELS; channel++) {
-        printf("Settings LEDC channel #%u\n", channel);
+        ESP_LOGI(LEDC_TAG, "Settings LEDC channel #%u", channel);
         ESP_ERROR_CHECK(ledc_channel_config(&ledc_channels[channel]));
     }
 }
 
-void ledcSetDutyCycle(ledc_channel_config_t *channel, uint32_t duty) {
-    ESP_ERROR_CHECK(ledc_set_duty(channel->speed_mode, channel->channel, duty));
-    ESP_ERROR_CHECK(ledc_update_duty(channel->speed_mode, channel->channel));
+void ledcSetDutyCycle(uint8_t channel, uint32_t duty) {
+    ESP_LOGI(LEDC_TAG, "Setting duty cycle of channel #%u to %u", channel, duty);
+    if (channel >= LED_CHANNELS) {
+        ESP_LOGW(LEDC_TAG, "Invalid channel #%u", channel);
+        return;
+    }
+    ledc_channel_config_t *config = &ledc_channels[channel];
+    ESP_ERROR_CHECK(ledc_set_duty(config->speed_mode, config->channel, duty));
+    ESP_ERROR_CHECK(ledc_update_duty(config->speed_mode, config->channel));
 }
 
-uint32_t ledcGetDutyCycle(ledc_channel_config_t *channel) {
-    return ledc_get_duty(channel->speed_mode, channel->channel);
+uint32_t ledcGetDutyCycle(uint8_t channel) {
+    ESP_LOGI(LEDC_TAG, "Getting duty cycle of channel #%u", channel);
+    if (channel >= LED_CHANNELS) {
+        ESP_LOGW(LEDC_TAG, "Invalid channel #%u", channel);
+        return UINT32_MAX;
+    }
+    ledc_channel_config_t *config = &ledc_channels[channel];
+    return ledc_get_duty(config->speed_mode, config->channel);
 }
