@@ -208,19 +208,10 @@ static void gattsProfileDeviceInfoEventHandler(esp_gatts_cb_event_t event, esp_g
             ESP_LOGI(GATTS_TAG, "SERVICE_START_EVT, status %d, service_handle %d\n", param->start.status, param->start.service_handle);
             break;
         case ESP_GATTS_CONNECT_EVT: {
-            esp_ble_conn_update_params_t conn_params = {0};
-            memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
-            /* For the IOS system, please reference the apple official documents about the ble connection parameters restrictions. */
-            conn_params.latency = 0;
-            conn_params.max_int = 0x20;    // max_int = 0x20*1.25ms = 40ms
-            conn_params.min_int = 0x10;    // min_int = 0x10*1.25ms = 20ms
-            conn_params.timeout = 400;    // timeout = 400*10ms = 4000ms
             ESP_LOGI(GATTS_TAG, "CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:", param->connect.conn_id,
                      param->connect.remote_bda[0], param->connect.remote_bda[1], param->connect.remote_bda[2],
                      param->connect.remote_bda[3], param->connect.remote_bda[4], param->connect.remote_bda[5]);
             gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].conn_id = param->connect.conn_id;
-            //start sent the update connection parameters to the peer device.
-            //ESP_ERROR_CHECK(esp_ble_gap_update_conn_params(&conn_params));
             ESP_ERROR_CHECK(esp_ble_gap_start_advertising(&adv_params));
             break;
         }
@@ -350,7 +341,7 @@ static void gattsProfileLightEventHandler(esp_gatts_cb_event_t event, esp_gatt_i
             ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
             gl_profile_tab[PROFILE_LIGHT_APP_ID].service_handle = param->create.service_handle;
             gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid.len = ESP_UUID_LEN_16;
-            gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_VOLTAGE;
+            gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_LIGHT_INTENSITY;
 
             esp_ble_gatts_start_service(gl_profile_tab[PROFILE_LIGHT_APP_ID].service_handle);
             esp_err_t add_char_ret = esp_ble_gatts_add_char(gl_profile_tab[PROFILE_LIGHT_APP_ID].service_handle,
