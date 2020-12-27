@@ -23,6 +23,7 @@
 #include <esp_log.h>
 
 #include "adc.h"
+#include "ina219.h"
 #include "ledc.h"
 
 /**

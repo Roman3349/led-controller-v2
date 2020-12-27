@@ -54,8 +54,14 @@ void iqrfRxTask(void *arg) {
         buffer[bytes] = 0;
         ESP_LOGI(RX_TAG, "Read %d bytes: '%s'", bytes, buffer);
         ESP_LOG_BUFFER_HEXDUMP(RX_TAG, buffer, bytes, ESP_LOG_INFO);
-        if (strcmp((char *) buffer, "getVoltage") == 0) {
+        if (strcmp((char *) buffer, "getAdcVoltage") == 0) {
             uint16_t voltage = adcReadVoltage();
+            char txBuffer[2] = {(voltage >> 8) & 0xff, voltage & 0xff};
+            uartSend(txBuffer, 2);
+            continue;
+        }
+        if (strcmp((char *) buffer, "getIna219Voltage") == 0) {
+            uint16_t voltage = ina219ReadBusVoltage();
             char txBuffer[2] = {(voltage >> 8) & 0xff, voltage & 0xff};
             uartSend(txBuffer, 2);
             continue;

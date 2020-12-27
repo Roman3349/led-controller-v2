@@ -78,7 +78,7 @@ static esp_ble_adv_params_t adv_params = {
 
 #define PROFILE_NUM                 3
 #define PROFILE_DEVICE_INFO_APP_ID  0
-#define PROFILE_VOLTAGE_APP_ID      1
+#define PROFILE_SENSOR_APP_ID       1
 #define PROFILE_LIGHT_APP_ID        2
 
 struct gatts_profile_inst {
@@ -89,7 +89,7 @@ struct gatts_profile_inst {
     uint16_t service_handle;
     esp_gatt_srvc_id_t service_id;
     uint16_t char_handle;
-    esp_bt_uuid_t char_uuid;
+    esp_bt_uuid_t* char_uuid;
     esp_gatt_perm_t perm;
     esp_gatt_char_prop_t property;
     uint16_t descr_handle;
@@ -102,7 +102,7 @@ static struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
                 .gatts_cb = gattsProfileDeviceInfoEventHandler,
                 .gatts_if = ESP_GATT_IF_NONE,
         },
-        [PROFILE_VOLTAGE_APP_ID] = {
+        [PROFILE_SENSOR_APP_ID] = {
                 .gatts_cb = gattsProfileVoltageEventHandler,
                 .gatts_if = ESP_GATT_IF_NONE,
         },
@@ -193,12 +193,13 @@ static void gattsProfileDeviceInfoEventHandler(esp_gatts_cb_event_t event, esp_g
         case ESP_GATTS_CREATE_EVT:
             ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
             gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].service_handle = param->create.service_handle;
-            gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].char_uuid.len = ESP_UUID_LEN_16;
-            gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_MANUFACTURER;
+            gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].char_uuid = (esp_bt_uuid_t *) malloc(sizeof(esp_bt_uuid_t));
+            gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].char_uuid[0].len = ESP_UUID_LEN_16;
+            gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].char_uuid[0].uuid.uuid16 = GATTS_CHAR_UUID_MANUFACTURER;
 
             esp_ble_gatts_start_service(gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].service_handle);
             esp_err_t add_char_ret = esp_ble_gatts_add_char(gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].service_handle,
-                                                            &gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].char_uuid,
+                                                            &gl_profile_tab[PROFILE_DEVICE_INFO_APP_ID].char_uuid[0],
                                                             ESP_GATT_PERM_READ, ESP_GATT_CHAR_PROP_BIT_READ, NULL, NULL);
             if (add_char_ret) {
                 ESP_LOGE(GATTS_TAG, "add char failed, error code =%x", add_char_ret);
@@ -234,12 +235,12 @@ static void gattsProfileVoltageEventHandler(esp_gatts_cb_event_t event, esp_gatt
     switch (event) {
         case ESP_GATTS_REG_EVT:
             ESP_LOGI(GATTS_TAG, "REGISTER_APP_EVT, status %d, app_id %d\n", param->reg.status, param->reg.app_id);
-            gl_profile_tab[PROFILE_VOLTAGE_APP_ID].service_id.is_primary = true;
-            gl_profile_tab[PROFILE_VOLTAGE_APP_ID].service_id.id.inst_id = 0x00;
-            gl_profile_tab[PROFILE_VOLTAGE_APP_ID].service_id.id.uuid.len = ESP_UUID_LEN_16;
-            gl_profile_tab[PROFILE_VOLTAGE_APP_ID].service_id.id.uuid.uuid.uuid16 = GATTS_SERVICE_UUID_VOLTAGE;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].service_id.is_primary = true;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].service_id.id.inst_id = 0x00;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].service_id.id.uuid.len = ESP_UUID_LEN_16;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].service_id.id.uuid.uuid.uuid16 = GATTS_SERVICE_UUID_SENSOR;
 
-            ESP_ERROR_CHECK(esp_ble_gatts_create_service(gatts_if, &gl_profile_tab[PROFILE_VOLTAGE_APP_ID].service_id, GATTS_NUM_HANDLE_VOLTAGE));
+            ESP_ERROR_CHECK(esp_ble_gatts_create_service(gatts_if, &gl_profile_tab[PROFILE_SENSOR_APP_ID].service_id, GATTS_NUM_HANDLE_SENSOR));
             break;
         case ESP_GATTS_READ_EVT: {
             ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n", param->read.conn_id, param->read.trans_id, param->read.handle);
@@ -247,9 +248,26 @@ static void gattsProfileVoltageEventHandler(esp_gatts_cb_event_t event, esp_gatt
             memset(&rsp, 0, sizeof(esp_gatt_rsp_t));
             rsp.attr_value.handle = param->read.handle;
             rsp.attr_value.len = 2;
-            uint16_t voltage = adcReadVoltage();
-            rsp.attr_value.value[0] = (voltage >> 8) & 0xff;
-            rsp.attr_value.value[1] = voltage & 0xff;
+            switch (param->read.handle) {
+                case 46: {
+                    uint16_t voltage = adcReadVoltage();
+                    rsp.attr_value.value[0] = (voltage >> 8) & 0xff;
+                    rsp.attr_value.value[1] = voltage & 0xff;
+                    break;
+                }
+                case 48: {
+                    uint16_t voltage = ina219ReadBusVoltage();
+                    rsp.attr_value.value[0] = (voltage >> 8) & 0xff;
+                    rsp.attr_value.value[1] = voltage & 0xff;
+                    break;
+                }
+                case 50: {
+                    int16_t current = ina219ReadCurrent();
+                    rsp.attr_value.value[0] = (current >> 8) & 0xff;
+                    rsp.attr_value.value[1] = current & 0xff;
+                    break;
+                }
+            }
             esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
             break;
         }
@@ -258,14 +276,31 @@ static void gattsProfileVoltageEventHandler(esp_gatts_cb_event_t event, esp_gatt
             break;
         case ESP_GATTS_CREATE_EVT:
             ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
-            gl_profile_tab[PROFILE_VOLTAGE_APP_ID].service_handle = param->create.service_handle;
-            gl_profile_tab[PROFILE_VOLTAGE_APP_ID].char_uuid.len = ESP_UUID_LEN_16;
-            gl_profile_tab[PROFILE_VOLTAGE_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_VOLTAGE;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].service_handle = param->create.service_handle;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid = (esp_bt_uuid_t *) malloc(3 * sizeof(esp_bt_uuid_t));
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[0].len = ESP_UUID_LEN_16;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[0].uuid.uuid16 = GATTS_CHAR_UUID_VOLTAGE;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[1].len = ESP_UUID_LEN_16;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[1].uuid.uuid16 = GATTS_CHAR_UUID_VOLTAGE;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[2].len = ESP_UUID_LEN_16;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[2].uuid.uuid16 = GATTS_CHAR_UUID_CURRENT;
 
-            esp_ble_gatts_start_service(gl_profile_tab[PROFILE_VOLTAGE_APP_ID].service_handle);
-            esp_err_t add_char_ret = esp_ble_gatts_add_char(gl_profile_tab[PROFILE_VOLTAGE_APP_ID].service_handle,
-                                                            &gl_profile_tab[PROFILE_VOLTAGE_APP_ID].char_uuid,
+            esp_ble_gatts_start_service(gl_profile_tab[PROFILE_SENSOR_APP_ID].service_handle);
+            esp_err_t add_char_ret = esp_ble_gatts_add_char(gl_profile_tab[PROFILE_SENSOR_APP_ID].service_handle,
+                                                            &gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[0],
                                                             ESP_GATT_PERM_READ, ESP_GATT_CHAR_PROP_BIT_READ, NULL, NULL);
+            if (add_char_ret) {
+                ESP_LOGE(GATTS_TAG, "add char failed, error code =%x", add_char_ret);
+            }
+            add_char_ret = esp_ble_gatts_add_char(gl_profile_tab[PROFILE_SENSOR_APP_ID].service_handle,
+                                                  &gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[1],
+                                                  ESP_GATT_PERM_READ, ESP_GATT_CHAR_PROP_BIT_READ, NULL, NULL);
+            if (add_char_ret) {
+                ESP_LOGE(GATTS_TAG, "add char failed, error code =%x", add_char_ret);
+            }
+            add_char_ret = esp_ble_gatts_add_char(gl_profile_tab[PROFILE_SENSOR_APP_ID].service_handle,
+                                                  &gl_profile_tab[PROFILE_SENSOR_APP_ID].char_uuid[2],
+                                                  ESP_GATT_PERM_READ, ESP_GATT_CHAR_PROP_BIT_READ, NULL, NULL);
             if (add_char_ret) {
                 ESP_LOGE(GATTS_TAG, "add char failed, error code =%x", add_char_ret);
             }
@@ -277,7 +312,7 @@ static void gattsProfileVoltageEventHandler(esp_gatts_cb_event_t event, esp_gatt
             ESP_LOGI(GATTS_TAG, "CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:", param->connect.conn_id,
                      param->connect.remote_bda[0], param->connect.remote_bda[1], param->connect.remote_bda[2],
                      param->connect.remote_bda[3], param->connect.remote_bda[4], param->connect.remote_bda[5]);
-            gl_profile_tab[PROFILE_VOLTAGE_APP_ID].conn_id = param->connect.conn_id;
+            gl_profile_tab[PROFILE_SENSOR_APP_ID].conn_id = param->connect.conn_id;
             break;
         case ESP_GATTS_CONF_EVT:
             ESP_LOGI(GATTS_TAG, "ESP_GATTS_CONF_EVT status %d attr_handle %d", param->conf.status, param->conf.handle);
@@ -340,12 +375,13 @@ static void gattsProfileLightEventHandler(esp_gatts_cb_event_t event, esp_gatt_i
         case ESP_GATTS_CREATE_EVT:
             ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d,  service_handle %d\n", param->create.status, param->create.service_handle);
             gl_profile_tab[PROFILE_LIGHT_APP_ID].service_handle = param->create.service_handle;
-            gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid.len = ESP_UUID_LEN_16;
-            gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_LIGHT_INTENSITY;
+            gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid = (esp_bt_uuid_t *) malloc(sizeof(esp_bt_uuid_t));
+            gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid[0].len = ESP_UUID_LEN_16;
+            gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid[0].uuid.uuid16 = GATTS_CHAR_UUID_LIGHT_INTENSITY;
 
             esp_ble_gatts_start_service(gl_profile_tab[PROFILE_LIGHT_APP_ID].service_handle);
             esp_err_t add_char_ret = esp_ble_gatts_add_char(gl_profile_tab[PROFILE_LIGHT_APP_ID].service_handle,
-                                                            &gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid,
+                                                            &gl_profile_tab[PROFILE_LIGHT_APP_ID].char_uuid[0],
                                                             ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
                                                             ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE, NULL, NULL);
             if (add_char_ret) {
@@ -413,7 +449,7 @@ void gatts_register(void) {
         ESP_LOGE(GATTS_TAG, "Device info GATTS app register error, error code = %x", ret);
         return;
     }
-    ret = esp_ble_gatts_app_register(PROFILE_VOLTAGE_APP_ID);
+    ret = esp_ble_gatts_app_register(PROFILE_SENSOR_APP_ID);
     if (ret) {
         ESP_LOGE(GATTS_TAG, "Sensors GATTS app register error, error code = %x", ret);
         return;

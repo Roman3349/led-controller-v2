@@ -24,6 +24,7 @@
 #include <esp_log.h>
 
 #include "adc.h"
+#include "ina219.h"
 #include "ledc.h"
 
 #define GATTS_TAG "GATTS"
@@ -32,9 +33,10 @@
 #define GATTS_CHAR_UUID_MANUFACTURER    0x2A29
 #define GATTS_NUM_HANDLE_DEVICE_INFO    4
 
-#define GATTS_SERVICE_UUID_VOLTAGE      0x183B
+#define GATTS_SERVICE_UUID_SENSOR       0x183B
 #define GATTS_CHAR_UUID_VOLTAGE         0x2B18
-#define GATTS_NUM_HANDLE_VOLTAGE        4
+#define GATTS_CHAR_UUID_CURRENT         0X2AEE
+#define GATTS_NUM_HANDLE_SENSOR         8
 
 #define GATTS_SERVICE_UUID_LIGHT_DATA   0x181C
 #define GATTS_CHAR_UUID_LIGHT_INTENSITY 0x2B01

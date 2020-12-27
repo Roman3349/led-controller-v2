@@ -52,8 +52,14 @@ void app_main(void) {
     printChipInfo();
     adcInit();
     ledcInit();
-    i2cInit();
+    ina219Init();
     iqrfInit();
     bleInit();
     xTaskCreate(iqrfRxTask, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
+    /*while(1) {
+        ESP_LOGI("INA219", "Bus voltage: %u mV", ina219ReadBusVoltage());
+        ESP_LOGI("INA219", "Shunt voltage: %d0 uV", ina219ReadShuntVoltage());
+        ESP_LOGI("INA219", "Current: %d mA", ina219ReadCurrent());
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }*/
 }
