@@ -60,9 +60,15 @@ void iqrfRxTask(void *arg) {
             uartSend(txBuffer, 2);
             continue;
         }
-        if (strcmp((char *) buffer, "getIna219Voltage") == 0) {
+        if (strcmp((char *) buffer, "getInaVoltage") == 0) {
             uint16_t voltage = ina219ReadBusVoltage();
             char txBuffer[2] = {(voltage >> 8) & 0xff, voltage & 0xff};
+            uartSend(txBuffer, 2);
+            continue;
+        }
+        if (strcmp((char *) buffer, "getCurrent") == 0) {
+            int16_t current = ina219ReadCurrent();
+            char txBuffer[2] = {(current >> 8) & 0xff, current & 0xff};
             uartSend(txBuffer, 2);
             continue;
         }
