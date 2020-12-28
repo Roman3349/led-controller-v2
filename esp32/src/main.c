@@ -41,10 +41,10 @@ void printChipInfo(void) {
            (chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
            (chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
     printf("silicon revision %d, ", chip_info.revision);
-    printf("%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
+    printf("%u MB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded"
                                                          : "external");
-    printf("Minimum free heap size: %d bytes\n",
+    printf("Minimum free heap size: %u bytes\n",
            esp_get_minimum_free_heap_size());
 }
 
