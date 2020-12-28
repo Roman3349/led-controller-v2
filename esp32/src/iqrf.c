@@ -30,9 +30,9 @@ void iqrfInit(void) {
             .source_clk = UART_SCLK_APB,
             .stop_bits = UART_STOP_BITS_1,
     };
-    uart_driver_install(UART_NUM_1, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
-    uart_param_config(UART_NUM_1, &config);
-    uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, RX_BUF_SIZE * 2, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &config));
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 }
 
 void uartSend(char *buffer, size_t size) {
@@ -54,52 +54,70 @@ void iqrfRxTask(void *arg) {
         buffer[bytes] = 0;
         ESP_LOGI(RX_TAG, "Read %d bytes: '%s'", bytes, buffer);
         ESP_LOG_BUFFER_HEXDUMP(RX_TAG, buffer, bytes, ESP_LOG_INFO);
-        if (strcmp((char *) buffer, "getAdcVoltage") == 0) {
-            uint16_t voltage = adcReadVoltage();
-            char txBuffer[2] = {(voltage >> 8) & 0xff, voltage & 0xff};
-            uartSend(txBuffer, 2);
-            continue;
-        }
-        if (strcmp((char *) buffer, "getInaVoltage") == 0) {
-            uint16_t voltage = ina219ReadBusVoltage();
-            char txBuffer[2] = {(voltage >> 8) & 0xff, voltage & 0xff};
-            uartSend(txBuffer, 2);
-            continue;
-        }
-        if (strcmp((char *) buffer, "getCurrent") == 0) {
-            int16_t current = ina219ReadCurrent();
-            char txBuffer[2] = {(current >> 8) & 0xff, current & 0xff};
-            uartSend(txBuffer, 2);
-            continue;
-        }
-        if (strncmp((char *) buffer, "setChannel,", 8) == 0) {
-            uint8_t channel = buffer[8] - '0';
-            if (channel >= LED_CHANNELS) {
-                continue;
+        char *string = (char *) buffer;
+        while (string != NULL) {
+            iqrfExecute(string);
+            string = strchr(string, '\n');
+            if (string == NULL || string[1] == '\0') {
+                break;
             }
-            unsigned long duty = strtoul((char *) &buffer[10], NULL, 10) * 10;
-            ledcSetDutyCycle(channel, duty > 1023 ? 1023 : duty);
-            continue;
-        }
-        if (strcmp((char *) buffer, "getChannels") == 0) {
-            char txBuffer[LED_CHANNELS] = {0,};
-            for (uint8_t channel = 0; channel < LED_CHANNELS; channel++) {
-                uint32_t duty = ledcGetDutyCycle(channel) / 10;
-                txBuffer[channel] = duty & 0xff;
-            }
-            uartSend(txBuffer, LED_CHANNELS);
-            continue;
-        }
-        if (strncmp((char *) buffer, "getChannel,", 8) == 0) {
-            uint8_t channel = buffer[8] - '0';
-            if (channel >= LED_CHANNELS) {
-                continue;
-            }
-            uint32_t duty = ledcGetDutyCycle(channel) / 10;
-            char txBuffer[1] = {duty & 0xff};
-            uartSend(txBuffer, 1);
-            continue;
-        }
+            string++;
+        };
     }
     free(buffer);
+}
+
+void iqrfExecute(char *buffer) {
+    char string[RX_BUF_SIZE + 1];
+    strcpy(string, buffer);
+    char *end = strchr(string, '\n');
+    if (end != NULL) {
+        end[0] = '\0';
+    }
+    if (strcmp(string, "getAdcVoltage") == 0) {
+        uint16_t voltage = adcReadVoltage();
+        char txBuffer[2] = {(voltage >> 8) & 0xff, voltage & 0xff};
+        uartSend(txBuffer, 2);
+        return;
+    }
+    if (strcmp(string, "getInaVoltage") == 0) {
+        uint16_t voltage = ina219ReadBusVoltage();
+        char txBuffer[2] = {(voltage >> 8) & 0xff, voltage & 0xff};
+        uartSend(txBuffer, 2);
+        return;
+    }
+    if (strcmp(string, "getCurrent") == 0) {
+        int16_t current = ina219ReadCurrent();
+        char txBuffer[2] = {(current >> 8) & 0xff, current & 0xff};
+        uartSend(txBuffer, 2);
+        return;
+    }
+    if (strncmp(string, "setChannel,", 8) == 0) {
+        uint8_t channel = string[8] - '0';
+        if (channel >= LED_CHANNELS) {
+            return;
+        }
+        unsigned long duty = strtoul((char *) &string[10], NULL, 10) * 10;
+        ledcSetDutyCycle(channel, duty > 1023 ? 1023 : duty);
+        return;
+    }
+    if (strcmp(string, "getChannels") == 0) {
+        char txBuffer[LED_CHANNELS] = {0,};
+        for (uint8_t channel = 0; channel < LED_CHANNELS; channel++) {
+            uint32_t duty = ledcGetDutyCycle(channel) / 10;
+            txBuffer[channel] = duty & 0xff;
+        }
+        uartSend(txBuffer, LED_CHANNELS);
+        return;
+    }
+    if (strncmp(string, "getChannel,", 8) == 0) {
+        uint8_t channel = string[8] - '0';
+        if (channel >= LED_CHANNELS) {
+            return;
+        }
+        uint32_t duty = ledcGetDutyCycle(channel) / 10;
+        char txBuffer[1] = {duty & 0xff};
+        uartSend(txBuffer, 1);
+        return;
+    }
 }

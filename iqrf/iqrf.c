@@ -94,9 +94,9 @@ uns8 txDataLen;
 #define UART_SPBRG_VALUE(Baud)  (DIV(F_OSC, (((uns24) 4) * (Baud))) - 1)
 
 // Strings in internal EEPROM
-#pragma cdata[__EESTART] = 'g', 'e', 't', 'A', 'd', 'c', 'V', 'o', 'l', 't', 'a', 'g', 'e', '\0'
-#pragma cdata[__EESTART + 16] = 'g', 'e', 't', 'I', 'n', 'a', 'V', 'o', 'l', 't', 'a', 'g', 'e', '\0'
-#pragma cdata[__EESTART + 32] = 'g', 'e', 't', 'C', 'u', 'r', 'r', 'e', 'n', 't', '\0'
+#pragma cdata[__EESTART] = 'g', 'e', 't', 'A', 'd', 'c', 'V', 'o', 'l', 't', 'a', 'g', 'e', '\n'
+#pragma cdata[__EESTART + 16] = 'g', 'e', 't', 'I', 'n', 'a', 'V', 'o', 'l', 't', 'a', 'g', 'e', '\n'
+#pragma cdata[__EESTART + 32] = 'g', 'e', 't', 'C', 'u', 'r', 'r', 'e', 'n', 't', '\n'
 
 // Must be the 1st defined function in the source code in order to be placed at the correct FLASH location!
 bit CustomDpaHandler() {
@@ -172,8 +172,8 @@ bit CustomDpaHandler() {
             // Called to allow a bonding button customization
             userReg1.0 = 0;
             if (IsButton) {
-        userReg1.0 = 1;
-    }
+                userReg1.0 = 1;
+            }
             return TRUE;
         case DpaEvent_DpaRequest:
             // Called to interpret DPA request for peripherals
