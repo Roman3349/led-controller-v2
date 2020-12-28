@@ -15,6 +15,14 @@
  * limitations under the License.
  */
 
+/*
+ * This custom DPA handler is based on the following examples:
+ * - BondingButton: https://doc.iqrf.org/DpaTechGuide/examples/CustomDpaHandler-BondingButton.c.html
+ * - HW UART: https://doc.iqrf.org/DpaTechGuide/examples/CustomDpaHandler-UserPeripheral-HW-UART.c.html
+ * - IQRF Standard Light template: https://doc.iqrf.org/DpaTechGuide/examples/1002_Light-Template.c.html
+ * - IQRF Standard Sensor template: https://doc.iqrf.org/DpaTechGuide/examples/1402_Sensor-Template.c.html
+ */
+
 // Default IQRF include (modify the path according to your setup)
 #include "include/IQRF.h"
 
@@ -47,7 +55,7 @@ uns16 sensorValueHighWord @ param4;
 void StoreValue(uns8 sensorType);
 
 // FRC parameter
-uns8  sensorIndexAndData;
+uns8 sensorIndexAndData;
 
 // Reads sensor value to the sensorValue variable and to responseFRCvalue(2B,4B) variable(s) based on FRC command @ _PCMD
 // Returns TRUE if the FRC is prepared
@@ -97,6 +105,8 @@ uns8 txDataLen;
 #pragma cdata[__EESTART] = 'g', 'e', 't', 'A', 'd', 'c', 'V', 'o', 'l', 't', 'a', 'g', 'e', '\n'
 #pragma cdata[__EESTART + 16] = 'g', 'e', 't', 'I', 'n', 'a', 'V', 'o', 'l', 't', 'a', 'g', 'e', '\n'
 #pragma cdata[__EESTART + 32] = 'g', 'e', 't', 'C', 'u', 'r', 'r', 'e', 'n', 't', '\n'
+#pragma cdata[__EESTART + 48] = 'g', 'e', 't', 'C', 'h', 'a', 'n', 'n', 'e', 'l', 's', '\n'
+#pragma cdata[__EESTART + 64] = 's', 'e', 't', 'C', 'h', 'a', 'n', 'n', 'e', 'l', ','
 
 // Must be the 1st defined function in the source code in order to be placed at the correct FLASH location!
 bit CustomDpaHandler() {
@@ -108,9 +118,6 @@ bit CustomDpaHandler() {
 
     // TXIE state before sleep
     static bit wasTXIE;
-
-    // Sleeping parameters, valid when Time != 0
-    static TPerOSSleep_Request PerOSSleep_Request;
 
     // Detect DPA event to handle
     switch (GetDpaEvent()) {
@@ -254,6 +261,9 @@ bit CustomDpaHandler() {
 
                             // Store bitmap of sensors to get values from
                             uns8 sensorsBitmap = FSR1[1];
+
+                            // Clean RX
+                            while(RxUART());
 
                             // 1st sensor (index 0) selected?
                             if (sensorsBitmap.0) {
@@ -438,13 +448,6 @@ bit CustomDpaHandler() {
 
                 // Some sensor was measured by FRC, check if there is a sleep request
                 FSR1++;
-                // Note: same as DataOutBeforeResponseFRC[3].0
-                if (INDF1.0) {
-                    // Remember sleep parameters to go to sleep at the Idle event later
-                    PerOSSleep_Request.Time.low8 = FSR1[4 - 3]; // Note: same as DataOutBeforeResponseFRC[4];
-                    PerOSSleep_Request.Time.high8 = FSR1[5 - 3]; // Note: same as DataOutBeforeResponseFRC[5];
-                    PerOSSleep_Request.Control = FSR1[6 - 3]; // Note: same as DataOutBeforeResponseFRC[6];
-                }
             }
             return FALSE;
 
@@ -453,12 +456,12 @@ bit CustomDpaHandler() {
 
             // In this example the FRC commands are fast
             switch (DataOutBeforeResponseFRC[0]) {
+                //case FRC_STD_LIGHT_ONOFF:
+                case FRC_STD_LIGHT_ALARM:
                 case FRC_STD_SENSORS_BIT:
                 case FRC_STD_SENSORS_1B:
                 case FRC_STD_SENSORS_2B:
                 case FRC_STD_SENSORS_4B:
-                    //case FRC_STD_LIGHT_ONOFF:
-                case FRC_STD_LIGHT_ALARM:
                     responseFRCvalue = _FRC_RESPONSE_TIME_40_MS;
                     break;
             }
@@ -574,9 +577,9 @@ bit Get1_AdcVoltage() {
     do {
         TxUART(*FSR1++);
     } while (--txDataLen != 0);
-    RxUART();
+    while(!RxUART());
     sensorValue.high8 = W;
-    RxUART();
+    while(!RxUART());
     sensorValue.low8 = W;
     FSR1 = fsr1Backup;
     switch (_PCMD) {
@@ -609,9 +612,9 @@ bit Get2_InaVoltage() {
     do {
         TxUART(*FSR1++);
     } while (--txDataLen != 0);
-    RxUART();
+    while(!RxUART());
     sensorValue.high8 = W;
-    RxUART();
+    while(!RxUART());
     sensorValue.low8 = W;
     FSR1 = fsr1Backup;
     switch (_PCMD) {
@@ -644,9 +647,9 @@ bit Get3_InaCurrent() {
     do {
         TxUART(*FSR1++);
     } while (--txDataLen != 0);
-    RxUART();
+    while(!RxUART());
     sensorValue.high8 = W;
-    RxUART();
+    while(!RxUART());
     sensorValue.low8 = W;
     FSR1 = fsr1Backup;
     switch (_PCMD) {
